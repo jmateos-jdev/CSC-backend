@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model categories {
+  id                 Int                  @id @default(autoincrement())
+  company_id         Int?
+  name               String               @db.VarChar(255)
+  parent_category_id Int?
+  created_at         DateTime?            @default(now()) @db.Timestamp(0)
+  companies          companies?           @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "categories_ibfk_1")
+  categories         categories?          @relation("categoriesTocategories", fields: [parent_category_id], references: [id], onUpdate: NoAction, map: "categories_ibfk_2")
+  other_categories   categories[]         @relation("categoriesTocategories")
+  product_categories product_categories[]
+
+  @@index([company_id], map: "company_id")
+  @@index([parent_category_id], map: "parent_category_id")
+}
+
+model companies {
+  id                Int                 @id @default(autoincrement())
+  name              String              @db.VarChar(255)
+  logo              String?             @db.Text
+  created_at        DateTime?           @default(now()) @db.Timestamp(0)
+  categories        categories[]
+  customers         customers[]
+  inventories       inventories[]
+  products          products[]
+  purchases         purchases[]
+  returns           returns[]
+  sales             sales[]
+  stock_adjustments stock_adjustments[]
+  suppliers         suppliers[]
+  users             users[]
+}
+
+model customers {
+  id         Int        @id @default(autoincrement())
+  company_id Int?
+  name       String     @db.VarChar(255)
+  created_by Int
+  created_at DateTime?  @default(now()) @db.Timestamp(0)
+  companies  companies? @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "customers_ibfk_1")
+  users      users      @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "customers_ibfk_2")
+  sales      sales[]
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+}
+
+model inventories {
+  id                Int                 @id @default(autoincrement())
+  company_id        Int
+  inventory_number  Int
+  created_by        Int
+  created_at        DateTime?           @default(now()) @db.Timestamp(0)
+  companies         companies           @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "inventories_ibfk_1")
+  users             users               @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "inventories_ibfk_2")
+  inventory_details inventory_details[]
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+}
+
+model inventory_details {
+  id           Int         @id @default(autoincrement())
+  inventory_id Int
+  product_id   Int
+  quantity     Int?        @default(1) @db.UnsignedInt
+  created_by   Int
+  created_at   DateTime?   @default(now()) @db.Timestamp(0)
+  inventories  inventories @relation(fields: [inventory_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "inventory_details_ibfk_1")
+  products     products    @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "inventory_details_ibfk_2")
+  users        users       @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "inventory_details_ibfk_3")
+
+  @@index([created_by], map: "created_by")
+  @@index([inventory_id], map: "inventory_id")
+  @@index([product_id], map: "product_id")
+}
+
+model product_categories {
+  product_id  Int
+  category_id Int
+  created_by  Int
+  created_at  DateTime?  @default(now()) @db.Timestamp(0)
+  products    products   @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "product_categories_ibfk_1")
+  categories  categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "product_categories_ibfk_2")
+  users       users      @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "product_categories_ibfk_3")
+
+  @@id([product_id, category_id])
+  @@index([category_id], map: "category_id")
+  @@index([created_by], map: "created_by")
+}
+
+model products {
+  id                 Int                  @id @default(autoincrement())
+  company_id         Int
+  name               String               @db.VarChar(255)
+  description        String?              @db.VarChar(255)
+  price              Decimal?             @db.Decimal(15, 2)
+  initial_stock      Int?                 @default(0) @db.UnsignedInt
+  unit_of_measure_id Int
+  barcode            String?              @db.VarChar(255)
+  created_by         Int
+  created_at         DateTime?            @default(now()) @db.Timestamp(0)
+  inventory_details  inventory_details[]
+  product_categories product_categories[]
+  companies          companies            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "products_ibfk_1")
+  units_of_measure   units_of_measure     @relation(fields: [unit_of_measure_id], references: [id], onUpdate: NoAction, map: "products_ibfk_2")
+  users              users                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "products_ibfk_3")
+  purchase_details   purchase_details[]
+  sale_details       sale_details[]
+  stock_adjustments  stock_adjustments[]
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+  @@index([unit_of_measure_id], map: "unit_of_measure_id")
+}
+
+model purchase_details {
+  id          Int       @id @default(autoincrement())
+  purchase_id Int
+  product_id  Int
+  quantity    Int?      @default(1) @db.UnsignedInt
+  unit_price  Decimal   @db.Decimal(15, 2)
+  discount    Decimal   @default(0.00) @db.Decimal(15, 2)
+  created_by  Int
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  purchases   purchases @relation(fields: [purchase_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "purchase_details_ibfk_1")
+  products    products  @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "purchase_details_ibfk_2")
+  users       users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "purchase_details_ibfk_3")
+
+  @@index([created_by], map: "created_by")
+  @@index([product_id], map: "product_id")
+  @@index([purchase_id], map: "purchase_id")
+}
+
+model purchases {
+  id               Int                @id @default(autoincrement())
+  company_id       Int
+  purchase_number  Int
+  supplier_id      Int
+  created_by       Int
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  purchase_details purchase_details[]
+  companies        companies          @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "purchases_ibfk_1")
+  suppliers        suppliers          @relation(fields: [supplier_id], references: [id], onUpdate: NoAction, map: "purchases_ibfk_2")
+  users            users              @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "purchases_ibfk_3")
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+  @@index([supplier_id], map: "supplier_id")
+}
+
+model returns {
+  id             Int          @id @default(autoincrement())
+  company_id     Int
+  return_number  Int
+  sale_detail_id Int
+  quantity       Int?         @default(1) @db.UnsignedInt
+  created_by     Int
+  created_at     DateTime?    @default(now()) @db.Timestamp(0)
+  companies      companies    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "returns_ibfk_1")
+  sale_details   sale_details @relation(fields: [sale_detail_id], references: [id], onUpdate: NoAction, map: "returns_ibfk_2")
+  users          users        @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "returns_ibfk_3")
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+  @@index([sale_detail_id], map: "sale_detail_id")
+}
+
+model sale_details {
+  id         Int       @id @default(autoincrement())
+  sale_id    Int
+  product_id Int
+  quantity   Int?      @default(1) @db.UnsignedInt
+  unit_price Decimal   @db.Decimal(15, 2)
+  discount   Decimal   @default(0.00) @db.Decimal(15, 2)
+  created_by Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  returns    returns[]
+  sales      sales     @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sale_details_ibfk_1")
+  products   products  @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "sale_details_ibfk_2")
+  users      users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sale_details_ibfk_3")
+
+  @@index([created_by], map: "created_by")
+  @@index([product_id], map: "product_id")
+  @@index([sale_id], map: "sale_id")
+}
+
+model sales {
+  id           Int            @id @default(autoincrement())
+  company_id   Int
+  sale_number  Int
+  customer_id  Int
+  created_by   Int
+  created_at   DateTime?      @default(now()) @db.Timestamp(0)
+  sale_details sale_details[]
+  companies    companies      @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sales_ibfk_1")
+  customers    customers      @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "sales_ibfk_2")
+  users        users          @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sales_ibfk_3")
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+  @@index([customer_id], map: "customer_id")
+}
+
+model stock_adjustments {
+  id         Int       @id @default(autoincrement())
+  company_id Int
+  product_id Int
+  quantity   Int
+  reason     String    @db.VarChar(255)
+  created_by Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  companies  companies @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stock_adjustments_ibfk_1")
+  products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stock_adjustments_ibfk_2")
+  users      users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "stock_adjustments_ibfk_3")
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+  @@index([product_id], map: "product_id")
+}
+
+model suppliers {
+  id         Int         @id @default(autoincrement())
+  company_id Int?
+  name       String      @db.VarChar(255)
+  created_by Int
+  created_at DateTime?   @default(now()) @db.Timestamp(0)
+  purchases  purchases[]
+  companies  companies?  @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "suppliers_ibfk_1")
+  users      users       @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "suppliers_ibfk_2")
+
+  @@index([company_id], map: "company_id")
+  @@index([created_by], map: "created_by")
+}
+
+model units_of_measure {
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(50)
+  abbreviation String     @db.VarChar(10)
+  created_at   DateTime?  @default(now()) @db.Timestamp(0)
+  products     products[]
+}
+
+model users {
+  id                 Int                  @id @default(autoincrement())
+  firebase_uid       String               @db.VarChar(255)
+  email              String               @db.VarChar(320)
+  main_company_id    Int?
+  created_at         DateTime?            @default(now()) @db.Timestamp(0)
+  customers          customers[]
+  inventories        inventories[]
+  inventory_details  inventory_details[]
+  product_categories product_categories[]
+  products           products[]
+  purchase_details   purchase_details[]
+  purchases          purchases[]
+  returns            returns[]
+  sale_details       sale_details[]
+  sales              sales[]
+  stock_adjustments  stock_adjustments[]
+  suppliers          suppliers[]
+  companies          companies?           @relation(fields: [main_company_id], references: [id], onUpdate: NoAction, map: "users_ibfk_1")
+
+  @@index([main_company_id], map: "main_company_id")
+}
